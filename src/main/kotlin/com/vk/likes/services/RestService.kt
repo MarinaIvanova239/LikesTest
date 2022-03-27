@@ -27,7 +27,7 @@ object RestService {
         try {
             val responseJsonNode = mapper().readTree(value.body.asString()).path("response")
             assertThat("Response field should be present", !responseJsonNode.isMissingNode)
-            resultBody = mapper().readValue(responseJsonNode.asText(), valueType)
+            resultBody = mapper().treeToValue(responseJsonNode, valueType)
         } catch (e: Exception) {
             Assert.fail("Exception with message = ${e.message} occurred while processing json: $value")
         }
@@ -85,17 +85,19 @@ object RestService {
     }
 
     fun getLikesResponse(getLikesParams: GetLikesParams): Response {
-        return request()
+        var getLikesRq =  request()
                 .param("type", getLikesParams.objectType)
                 .param("owner_id", getLikesParams.ownerId)
                 .param("item_id", getLikesParams.objectId)
-                .param("page_url", getLikesParams.pageUrl)
                 .param("filter", getLikesParams.filter)
-                .param("friends_only", getLikesParams.friendsOnly)
-                .param("extended", getLikesParams.extended)
-                .param("offset", getLikesParams.offset)
-                .param("count", getLikesParams.count)
                 .param("skip_own", getLikesParams.skipOwn)
-                .get("likes.getList")
+
+        if (nonNull(getLikesParams.pageUrl)) getLikesRq = getLikesRq.param("page_url", getLikesParams.pageUrl)
+        if (nonNull(getLikesParams.friendsOnly)) getLikesRq = getLikesRq.param("friends_only", getLikesParams.friendsOnly)
+        if (nonNull(getLikesParams.extended)) getLikesRq = getLikesRq.param("extended", getLikesParams.extended)
+        if (nonNull(getLikesParams.offset)) getLikesRq = getLikesRq.param("offset", getLikesParams.offset)
+        if (nonNull(getLikesParams.count)) getLikesRq = getLikesRq.param("count", getLikesParams.count)
+
+        return getLikesRq.get("likes.getList")
     }
 }

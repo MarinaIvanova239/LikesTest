@@ -17,14 +17,14 @@ data class CheckLikeParams(
 )
 
 data class GetLikesParams(
-        val objectType: ObjectType = ObjectType.audio,
+        val objectType: ObjectType = ObjectType.post,
         val ownerId: Int = 0,
         val objectId: Int = 0,
-        val pageUrl: String = "",
+        val pageUrl: String? = null,
         val filter: String = "likes",
-        val friendsOnly: Int = 0,
-        val extended: Int = 0,
-        val offset: Int = 0,
-        val count: Int = 0,
+        val friendsOnly: Int? = null,
+        val extended: Int? = null,
+        val offset: Int? = null,
+        val count: Int? = null,
         val skipOwn: Int = 0
 )
