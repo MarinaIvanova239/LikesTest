@@ -28,7 +28,7 @@ object RestService {
         var resultBody = valueType.newInstance()
         try {
             val responseJsonNode = mapper.readTree(value.body.asString()).path(responsePath)
-            assertThat("$responsePath field should be present", !responseJsonNode.isMissingNode)
+            assertThat("Expected $responsePath field to be present, but it was not", !responseJsonNode.isMissingNode)
             resultBody = mapper.treeToValue(responseJsonNode, valueType)
         } catch (e: Exception) {
             Assert.fail("Exception with message = ${e.message} occurred while processing json: $value")

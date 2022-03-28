@@ -1,11 +1,11 @@
 package com.vk.likes.rest
 
 import com.vk.likes.base.BaseTest
-import com.vk.likes.entities.request.AddLikeParams
+import com.vk.likes.entities.ObjectType
 import com.vk.likes.entities.request.GetLikesParams
 import com.vk.likes.entities.response.UserLikesList
 import com.vk.likes.services.RestService.getLikes
-import com.vk.likes.services.RestService.getLikesResponse
+import com.vk.likes.services.RestService.getLikesWithExpectingError
 import org.hamcrest.MatcherAssert.assertThat
 import org.testng.annotations.DataProvider
 import org.testng.annotations.Test
@@ -14,69 +14,92 @@ import org.unitils.reflectionassert.ReflectionComparatorMode.LENIENT_ORDER
 
 class GetLikesTest: BaseTest() {
 
-    @DataProvider(name = "likesParamsAndUsersList")
-    fun likesParamsAndUsersList(): MutableIterator<Array<Any>> {
+    @DataProvider(name = "getLikesParamsAndExpectedUsersList")
+    fun getLikesParamsAndExpectedUsersList(): MutableIterator<Array<Any>> {
         // empty users list
-        val getLikesParams1 = AddLikeParams(
-
+        val getZeroLikesParams = GetLikesParams(
+                ownerId = 9599485,
+                objectId = 4713
         )
 
-        val usersList1 = UserLikesList(
+        val expectedEmptyUserList = UserLikesList(
                 userCount = 0,
                 userIds = emptyList()
         )
 
         // 1 user list
-        val getLikesParams2 = GetLikesParams(
-
+        val getSingleLikeParams = GetLikesParams(
+                ownerId = 9599485,
+                objectId = 4712
         )
 
-        val usersList2 = UserLikesList(
-                userCount = 0,
-                userIds = emptyList()
+        val expectedSingleUserList = UserLikesList(
+                userCount = 1,
+                userIds = listOf(87445300)
         )
 
         // > 100 users list
-        val getLikesParams3 = GetLikesParams(
-
+        val getLikesWhenSizeMoreThanDefaultCount = GetLikesParams(
+                objectType = ObjectType.photo,
+                ownerId = 465830,
+                objectId = 457239397
         )
 
-        val usersList3 = UserLikesList(
-                userCount = 0,
-                userIds = emptyList()
+        val expectedLargeUsersList = UserLikesList(
+                userCount = 127,
+                userIds = listOf()
         )
 
         return arrayListOf(
-                arrayOf(getLikesParams1, usersList1),
-                arrayOf(getLikesParams2, usersList2),
-                arrayOf(getLikesParams3, usersList3)
+                arrayOf(getZeroLikesParams, expectedEmptyUserList),
+                arrayOf(getSingleLikeParams, expectedSingleUserList),
+                arrayOf(getLikesWhenSizeMoreThanDefaultCount, expectedLargeUsersList)
         ).iterator()
     }
 
-    @Test(dataProvider = "likesParamsAndUsersList")
-    fun getLikesWithDifferentUsersNumberTest(getLikesParams: GetLikesParams, expectedUserLikesList: UserLikesList) {
+    @Test(dataProvider = "getLikesParamsAndExpectedUsersList")
+    fun getLikesWithDifferentUsersCountTest(getLikesParams: GetLikesParams, expectedUserLikesList: UserLikesList) {
         val actualUserLikesList = getLikes(getLikesParams)
-        assertReflectionEquals(expectedUserLikesList, actualUserLikesList, LENIENT_ORDER)
+        if (expectedUserLikesList.userCount <= 100) {
+            assertReflectionEquals(expectedUserLikesList, actualUserLikesList, LENIENT_ORDER)
+        } else {
+            assertThat("Users count should be the same as expected", expectedUserLikesList.userCount == actualUserLikesList.userCount)
+            assertThat("User ids list should be equal or less than 100", actualUserLikesList.userIds.size <= 100)
+        }
+    }
+
+
+    @Test
+    fun getInformationAboutLikesFromPrivatePageShouldReturnError() {
+        // given
+        val userIdWithPrivatePage = 85645519
+        val getLikeParams = GetLikesParams(ownerId = userIdWithPrivatePage, objectId = 1)
+        // when
+        val errorDescription = getLikesWithExpectingError(getLikeParams)
+        // then
+        assertThat("Expect status code = 15, but actual ${errorDescription.code}", errorDescription.code == 15)
+        assertThat("Expect error description that access is denied", errorDescription.message.contains("Access denied"))
     }
 
     @Test
-    fun getLikesWhenObjectDoesNotExist() {
-        val getLikesRs = getLikesResponse(GetLikesParams(objectId = 0))
-        assertThat("Expect object cannot be found error, but actual ${getLikesRs.statusCode}",
-                getLikesRs.statusCode == 404)
+    fun getLikesForNonExistentObject() {
+        // given
+        val getLikeParams = GetLikesParams(ownerId = -22822305, objectId = Int.MAX_VALUE)
+        // when
+        val errorDescription = getLikesWithExpectingError(getLikeParams)
+        // then
+        // реальное поведение другое, возвращается объект с count = 0 и пустым списком, но я бы ожидала ошибку
+        assertThat("Expect status code = 100, but actual = ${errorDescription.code}", errorDescription.code == 100)
+        assertThat("Expect description that object cannot be found", errorDescription.message.contains("object not found"))
     }
 
     @Test
-    fun getLikesWhenReactionCannotBeAppliedToObject() {
-        val getLikesRs = getLikesResponse(GetLikesParams(objectId = 0))
-        assertThat("Expect that reaction cannot be applied to object, but actual ${getLikesRs.statusCode}",
-                getLikesRs.statusCode == 232)
-    }
-
-    @Test
-    fun getRepostInformationWhenRequestIsNotFromOwner() {
-        val getLikesRs = getLikesResponse(GetLikesParams(objectId = 0))
-        assertThat("Expect that repost information cannot be get by not owner, but actual ${getLikesRs.statusCode}",
-                getLikesRs.statusCode == 232)
+    fun getCopiesOfObjectWhichWasCreatedByDifferentOwner() {
+        // given
+        val getLikeParams = GetLikesParams(ownerId = 9599485, objectId = 4700, filter = "copies")
+        // when
+        val getCopiesResult = getLikes(getLikeParams)
+        // then
+        assertReflectionEquals(UserLikesList(userCount = 0, userIds = emptyList()), getCopiesResult, LENIENT_ORDER)
     }
 }
