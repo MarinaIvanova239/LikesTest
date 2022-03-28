@@ -11,5 +11,7 @@ enum class ObjectType {
     photo_comment,
     video_comment,
     topic_comment,
-    market_comment
+    market_comment,
+    post_ads,
+    sitepage
 }

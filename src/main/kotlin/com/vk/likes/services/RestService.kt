@@ -5,7 +5,8 @@ import com.vk.likes.entities.request.AddLikeParams
 import com.vk.likes.entities.request.CheckLikeParams
 import com.vk.likes.entities.request.GetLikesParams
 import com.vk.likes.entities.response.*
-import com.vk.likes.services.AuthService.getAccessToken
+import com.vk.likes.services.AuthService.getOfflineScopeAccessToken
+import com.vk.likes.services.AuthService.getWallScopeAccessToken
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import io.restassured.response.Response
@@ -20,14 +21,15 @@ object RestService {
         return ObjectMapper()
     }
 
-    private fun<T> mapWithStatusCheck(value: Response, valueType: Class<T>, objectDescription: String = "Value"): T {
+    private fun<T> mapWithStatusCheck(value: Response, valueType: Class<T>, objectDescription: String = "Value",
+                                      mapper: ObjectMapper = mapper(), responsePath: String = "response"): T {
         assertThat("Request for $objectDescription should be successfully executed, but actual ${value.statusCode}",
                 value.statusCode == 200)
         var resultBody = valueType.newInstance()
         try {
-            val responseJsonNode = mapper().readTree(value.body.asString()).path("response")
-            assertThat("Response field should be present", !responseJsonNode.isMissingNode)
-            resultBody = mapper().treeToValue(responseJsonNode, valueType)
+            val responseJsonNode = mapper.readTree(value.body.asString()).path(responsePath)
+            assertThat("$responsePath field should be present", !responseJsonNode.isMissingNode)
+            resultBody = mapper.treeToValue(responseJsonNode, valueType)
         } catch (e: Exception) {
             Assert.fail("Exception with message = ${e.message} occurred while processing json: $value")
         }
@@ -35,21 +37,43 @@ object RestService {
         return resultBody
     }
 
-    private fun request(): RequestSpecification {
+    private fun mapWithExpectingError(value: Response, objectDescription: String = "Value"): ErrorDescription {
+        return mapWithStatusCheck(value, ErrorDescription::class.java, objectDescription, responsePath = "error")
+    }
+
+    private fun requestReturnTooManyRequestsError(value: Response): Boolean {
+        val responseJsonNode = mapper().readTree(value.body.asString()).path("error")
+        if (responseJsonNode.isMissingNode) return false
+        if (mapper().treeToValue(responseJsonNode, ErrorDescription::class.java).code == 6) return true
+        return false
+    }
+
+    private fun request(accessToken: String = getOfflineScopeAccessToken()): RequestSpecification {
         return RestAssured.given()
                 .baseUri("https://api.vk.com/method/")
                 .accept(ContentType.JSON)
-                .param("access_token", getAccessToken())
+                .param("access_token", accessToken)
                 .param("v", "5.131")
     }
 
     fun addLike(addLikeParams: AddLikeParams): LikesCount {
-        val addLikeRs = addLikeResponse(addLikeParams)
+        var addLikeRs = addLikeResponse(addLikeParams)
+        for (i in 1..2) {
+            if (requestReturnTooManyRequestsError(addLikeRs)) {
+                Thread.sleep(1_000)
+                addLikeRs = addLikeResponse(addLikeParams)
+            } else break
+        }
         return mapWithStatusCheck(addLikeRs, LikesCount::class.java, objectDescription = "add like")
     }
 
-    fun addLikeResponse(addLikeParams: AddLikeParams): Response {
-        var addLikeRq = request()
+    fun addLikeWithExpectingError(addLikeParams: AddLikeParams, accessToken: String = getWallScopeAccessToken()): ErrorDescription {
+        val addLikeRs = addLikeResponse(addLikeParams, accessToken)
+        return mapWithExpectingError(addLikeRs, objectDescription = "add like")
+    }
+
+    private fun addLikeResponse(addLikeParams: AddLikeParams, accessToken: String = getWallScopeAccessToken()): Response {
+        var addLikeRq = request(accessToken)
                 .param("type", addLikeParams.objectType)
                 .param("owner_id", addLikeParams.ownerId)
                 .param("item_id", addLikeParams.objectId)
@@ -58,7 +82,7 @@ object RestService {
     }
 
     fun deleteLike(deleteLikeParams: AddLikeParams): LikesCount {
-        var deleteLikeRq = request()
+        var deleteLikeRq = request(accessToken = getWallScopeAccessToken())
                 .param("type", deleteLikeParams.objectType)
                 .param("owner_id", deleteLikeParams.ownerId)
                 .param("item_id", deleteLikeParams.objectId)
@@ -84,7 +108,12 @@ object RestService {
         return mapWithStatusCheck(getLikesRs, UserLikesList::class.java, objectDescription = "get user likes")
     }
 
-    fun getLikesResponse(getLikesParams: GetLikesParams): Response {
+    fun getLikesWithExpectingError(getLikesParams: GetLikesParams): ErrorDescription {
+        val getLikeRs = getLikesResponse(getLikesParams)
+        return mapWithExpectingError(getLikeRs, objectDescription = "add like")
+    }
+
+    private fun getLikesResponse(getLikesParams: GetLikesParams): Response {
         var getLikesRq =  request()
                 .param("type", getLikesParams.objectType)
                 .param("owner_id", getLikesParams.ownerId)
@@ -100,4 +129,5 @@ object RestService {
 
         return getLikesRq.get("likes.getList")
     }
+
 }

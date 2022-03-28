@@ -3,6 +3,7 @@
 <suite name="Like Tests" verbose="1">
     <test name="Get Likes Tests" preserve-order="true">
         <classes>
+            <class name="com.vk.likes.rest.AddLikesTest"/>
             <class name="com.vk.likes.rest.GetLikesTest"/>
         </classes>
     </test>

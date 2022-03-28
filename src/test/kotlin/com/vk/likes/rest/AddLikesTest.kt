@@ -1,11 +1,14 @@
 package com.vk.likes.rest
 
 import com.vk.likes.base.BaseTest
+import com.vk.likes.config.Config.clientId
+import com.vk.likes.entities.ObjectType
 import com.vk.likes.entities.request.AddLikeParams
 import com.vk.likes.entities.request.CheckLikeParams
 import com.vk.likes.entities.request.GetLikesParams
+import com.vk.likes.services.AuthService.getOfflineScopeAccessToken
 import com.vk.likes.services.RestService.addLike
-import com.vk.likes.services.RestService.addLikeResponse
+import com.vk.likes.services.RestService.addLikeWithExpectingError
 import com.vk.likes.services.RestService.checkIfObjectIsLiked
 import com.vk.likes.services.RestService.deleteLike
 import com.vk.likes.services.RestService.getLikes
@@ -24,61 +27,88 @@ class AddLikesTest: BaseTest() {
         likeParams = null
     }
 
-    @DataProvider(name = "addLikesParamsAndExpectedLikesCount")
-    fun addLikesParamsAndExpectedLikesCount(): MutableIterator<Array<AddLikeParams>> {
+    @DataProvider(name = "addLikesParamsAndCurrentUserId")
+    fun addLikesParamsAndUserId(): MutableIterator<Array<AddLikeParams>> {
         // empty users list
-        val addLikeParams1 = AddLikeParams(
+        val addLikeToOpenProfileParams = AddLikeParams(
+                ownerId = 9599485,
+                objectId = 4713
+        )
+
+        val addLikeToOpenGroupParams = AddLikeParams(
+                ownerId = -22822305,
+                objectId = 1286624
+        )
+
+        val addLikeToPublicPhotoParams = AddLikeParams(
+                objectType = ObjectType.photo,
+                ownerId = -22822305,
+                objectId = 457330266
         )
 
         return arrayListOf(
-                arrayOf(addLikeParams1)
+                arrayOf(addLikeToOpenProfileParams),
+                arrayOf(addLikeToOpenGroupParams),
+                arrayOf(addLikeToPublicPhotoParams)
         ).iterator()
     }
 
-    @Test(dataProvider = "addLikesParamsAndExpectedLikesCount")
-    fun addLikeTest(addLikeParams: AddLikeParams) {
+    @Test(dataProvider = "addLikesParamsAndCurrentUserId")
+    fun likesCanBeAddedToDifferentObjectsTest(addLikeParams: AddLikeParams) {
         // given
         likeParams = addLikeParams
-        val likesCountBeforeTest = getLikes(GetLikesParams()).userCount
+        val likesCountBeforeTest = getLikes(GetLikesParams(
+                ownerId = addLikeParams.ownerId,
+                objectId = addLikeParams.objectId,
+                objectType = addLikeParams.objectType)
+        ).userCount
         // when
         val addLikeResult = addLike(addLikeParams)
         // then
         assertThat("Likes count should be increased by 1", addLikeResult.likesCount == likesCountBeforeTest + 1L)
-        assertThat("Object should be in user's likes list", checkIfObjectIsLiked(CheckLikeParams()).isLiked == 1)
+        assertThat("Object should be in user's likes list", checkIfObjectIsLiked(
+                CheckLikeParams(ownerId = addLikeParams.ownerId,
+                        objectType = addLikeParams.objectType,
+                        objectId = addLikeParams.objectId,
+                        userId = clientId))
+                .isLiked == 1)
     }
 
     @Test
-    fun addLikeToPrivateObjectWithoutAccessToken() {
+    fun likesCannotBeAddedToObjectOnPrivatePage() {
         // given
-        val addLikeParams = AddLikeParams(objectId = 0)
+        val userIdWithPrivatePage = 85645519
+        val likePrivateObjectParams = AddLikeParams(ownerId = userIdWithPrivatePage, objectId = 1)
         // when
-        val addLikeResult = addLikeResponse(addLikeParams)
+        val errorDescription = addLikeWithExpectingError(likePrivateObjectParams)
         // then
-        assertThat("Expect that reaction cannot be applied to object, but actual ${addLikeResult.statusCode}",
-                addLikeResult.statusCode == 30)
+        assertThat("Expect status code = 30, but actual ${errorDescription.code}", errorDescription.code == 30)
+        assertThat("Expect description that profile is private", errorDescription.message.contains("This profile is private"))
     }
 
     @Test
-    fun addLikeToNonExistentObject() {
+    fun errorShouldBeReturnedWhenApplyingLikeToNonExistentObject() {
         // given
-        val addLikeParams = AddLikeParams(objectId = 0)
+        val nonExistentObjectParams = AddLikeParams(ownerId = -22822305, objectId = Int.MAX_VALUE)
         // when
-        val addLikeResult = addLikeResponse(addLikeParams)
+        val errorDescription = addLikeWithExpectingError(nonExistentObjectParams)
         // then
-        assertThat("Expect that reaction cannot be applied to object, but actual ${addLikeResult.statusCode}",
-                addLikeResult.statusCode == 404)
+        assertThat("Expect status code = 100, but actual = ${errorDescription.code}", errorDescription.code == 100)
+        assertThat("Expect description that object cannot be found", errorDescription.message.contains("object not found"))
     }
 
     @Test
-    fun addLikeToObjectWithInvalidType() {
+    fun likeCannotBeAddedToProjectIfAccessTokenDoesNotHaveWallScope() {
         // given
-        val addLikeParams = AddLikeParams(objectId = 0)
-        val likesCountBeforeTest = getLikes(GetLikesParams()).userCount
+        val tokenWithIncorrectScope = getOfflineScopeAccessToken()
+        val publicPostParams = AddLikeParams(ownerId = -22822305, objectId = 1286624)
+        val likesCountBeforeTest = getLikes(GetLikesParams(objectId = publicPostParams.objectId, ownerId = publicPostParams.ownerId)).userCount
         // when
-        val addLikeResult = addLikeResponse(addLikeParams)
+        val errorDescription = addLikeWithExpectingError(publicPostParams, accessToken = tokenWithIncorrectScope)
         // then
-        assertThat("Expect that reaction cannot be applied to object, but actual ${addLikeResult.statusCode}",
-                addLikeResult.statusCode == 232)
-        assertThat("Likes count should not increase", getLikes(GetLikesParams()).userCount == likesCountBeforeTest)
+        assertThat("Expect status code = 15, but actual ${errorDescription.code}", errorDescription.code == 15)
+        assertThat("Expect error description that access is denied", errorDescription.message.contains("Access denied"))
+        assertThat("Likes count should not change", getLikes(GetLikesParams(objectId = publicPostParams.objectId,
+                ownerId = publicPostParams.ownerId)).userCount == likesCountBeforeTest)
     }
 }
