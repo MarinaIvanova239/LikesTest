@@ -29,17 +29,19 @@ class AddLikesTest: BaseTest() {
 
     @DataProvider(name = "addLikesParamsAndCurrentUserId")
     fun addLikesParamsAndUserId(): MutableIterator<Array<AddLikeParams>> {
-        // empty users list
+        // like post of profile
         val addLikeToOpenProfileParams = AddLikeParams(
                 ownerId = 9599485,
                 objectId = 4713
         )
 
+        // like post of group
         val addLikeToOpenGroupParams = AddLikeParams(
                 ownerId = -22822305,
                 objectId = 1286624
         )
 
+        // like photo
         val addLikeToPublicPhotoParams = AddLikeParams(
                 objectType = ObjectType.photo,
                 ownerId = -22822305,
