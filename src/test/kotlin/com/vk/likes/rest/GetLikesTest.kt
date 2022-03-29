@@ -1,11 +1,12 @@
 package com.vk.likes.rest
 
 import com.vk.likes.base.BaseTest
+import com.vk.likes.entities.FilterType.copies
 import com.vk.likes.entities.ObjectType
 import com.vk.likes.entities.request.GetLikesParams
 import com.vk.likes.entities.response.UserLikesList
-import com.vk.likes.services.RestService.getLikes
-import com.vk.likes.services.RestService.getLikesWithExpectingError
+import com.vk.likes.services.LikeService.getLikes
+import com.vk.likes.services.LikeService.getLikesWithExpectingError
 import org.hamcrest.MatcherAssert.assertThat
 import org.testng.annotations.DataProvider
 import org.testng.annotations.Test
@@ -47,6 +48,7 @@ class GetLikesTest: BaseTest() {
 
         val expectedLargeUsersList = UserLikesList(
                 userCount = 127,
+                // here should be predefined list of users (or from database, for example)
                 userIds = listOf()
         )
 
@@ -68,7 +70,6 @@ class GetLikesTest: BaseTest() {
         }
     }
 
-
     @Test
     fun getInformationAboutLikesFromPrivatePageShouldReturnError() {
         // given
@@ -88,7 +89,7 @@ class GetLikesTest: BaseTest() {
         // when
         val errorDescription = getLikesWithExpectingError(getLikeParams)
         // then
-        // реальное поведение другое, возвращается объект с count = 0 и пустым списком, но я бы ожидала ошибку
+        // actual behaviour is that object with count = 0 and empty users list is returned, but I expected error that object is not found
         assertThat("Expect status code = 100, but actual = ${errorDescription.code}", errorDescription.code == 100)
         assertThat("Expect description that object cannot be found", errorDescription.message.contains("object not found"))
     }
@@ -96,7 +97,7 @@ class GetLikesTest: BaseTest() {
     @Test
     fun getCopiesOfObjectWhichWasCreatedByDifferentOwner() {
         // given
-        val getLikeParams = GetLikesParams(ownerId = 9599485, objectId = 4700, filter = "copies")
+        val getLikeParams = GetLikesParams(ownerId = 9599485, objectId = 4700, filter = copies)
         // when
         val getCopiesResult = getLikes(getLikeParams)
         // then

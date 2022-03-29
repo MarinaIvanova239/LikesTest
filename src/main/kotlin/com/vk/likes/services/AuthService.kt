@@ -1,14 +1,15 @@
 package com.vk.likes.services
 
-import com.vk.likes.config.Config
+import com.vk.likes.config.Properties
 
 object AuthService {
+    // here can be authorization flow, but let's assume that current implementations is getting token from system properties
 
     fun getOfflineScopeAccessToken(): String {
-        return Config.accessTokenWithOfflineScope
+        return Properties.accessTokenWithOfflineScope
     }
 
     fun getWallScopeAccessToken(): String {
-        return Config.accessTokenWithWallScope
+        return Properties.accessTokenWithWallScope
     }
 }

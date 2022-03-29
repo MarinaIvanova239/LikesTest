@@ -1,17 +1,17 @@
 package com.vk.likes.rest
 
 import com.vk.likes.base.BaseTest
-import com.vk.likes.config.Config.clientId
+import com.vk.likes.config.Properties.clientId
 import com.vk.likes.entities.ObjectType
 import com.vk.likes.entities.request.AddLikeParams
 import com.vk.likes.entities.request.CheckLikeParams
 import com.vk.likes.entities.request.GetLikesParams
 import com.vk.likes.services.AuthService.getOfflineScopeAccessToken
-import com.vk.likes.services.RestService.addLike
-import com.vk.likes.services.RestService.addLikeWithExpectingError
-import com.vk.likes.services.RestService.checkIfObjectIsLiked
-import com.vk.likes.services.RestService.deleteLike
-import com.vk.likes.services.RestService.getLikes
+import com.vk.likes.services.LikeService.addLike
+import com.vk.likes.services.LikeService.addLikeWithExpectingError
+import com.vk.likes.services.LikeService.checkIfObjectIsLiked
+import com.vk.likes.services.LikeService.deleteLike
+import com.vk.likes.services.LikeService.getLikes
 import org.hamcrest.MatcherAssert.assertThat
 import org.testng.annotations.AfterMethod
 import org.testng.annotations.DataProvider
