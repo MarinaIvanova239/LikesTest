@@ -3,7 +3,9 @@
 ## Параметры
 
 vk.accessToken.wallScope - токен с правами доступа wall
+
 vk.accessToken.offlineScope - токен с правами доступа offline
+
 vk.clientId - идентификатор пользователя, который вернулся в поле userId при получении токена
 
 ## Получение токена
